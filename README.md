@@ -1,24 +1,26 @@
 # Transaction Aggregator
 
-A Spring Boot service that aggregates transaction data from multiple remote servers.
+A Spring Boot service that pulls a user's transactions from two separate
+backend servers, combines them, and returns a single sorted list.
 
-## Features
+I built this to get hands-on with the kind of problems that come up when one
+service has to talk to several others: flaky upstreams, slow responses, and
+repeated requests for the same data.
 
-- Fetches transaction data from two remote servers concurrently using async requests
-- Merges and sorts transactions by timestamp (newest first)
-- Handles server errors (503, 529) with up to 5 retries
-- Caches results per account to optimize performance
+## What it does
 
-## Endpoints
+When a client asks for an account's transactions, the service calls both
+backends at the same time, waits for both to come back, then merges the results
+and sorts them newest-first before sending them on.
 
-```
-GET /aggregate?account={accountNumber}
-```
+A few things it handles along the way:
 
-Returns a JSON array of transactions sorted by timestamp descending.
+- **Concurrent calls.** The two backends are queried in parallel with
+  `CompletableFuture`, so total wait time is roughly the slower of the two
+  rather than both added together.
+- **Flaky servers.** The backends sometimes return 503 or 529 instead of data.
+  The service retries up to 5 times before giving up on that server.
+- **Repeated lookups.** Results are cached per account with Spring's
+  `@Cacheable`, so asking for the same account again skips the network round trip.
 
-## Running the app
-
-```bash
-./gradlew :app:bootRun
-```
+## Endpoint
